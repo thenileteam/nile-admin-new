@@ -22,10 +22,20 @@ export const createAdmin = async (body: {
   firstName: string;
   lastName: string;
   email: string;
-  password: string;
+  password?: string;
   role: AdminRole;
+  upgradeIfExists?: boolean;
 }) => {
   const { data } = await api.post("/users/admin/admins", body);
+  return unwrap<AdminSummary>(data);
+};
+
+export const upgradeUserToAdmin = async (body: {
+  userId?: string;
+  email?: string;
+  role: AdminRole;
+}) => {
+  const { data } = await api.post("/users/admin/admins/upgrade", body);
   return unwrap<AdminSummary>(data);
 };
 

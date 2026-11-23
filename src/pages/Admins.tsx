@@ -1,9 +1,18 @@
+// Admins page allowing superadmins to manage admin accounts, upgrade existing users, and reset credentials
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, UserCheck } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { createAdmin, listAdmins, resetAdminPassword, updateAdmin, type AdminSummary } from "@/api/admins";
+import {
+  createAdmin,
+  listAdmins,
+  resetAdminPassword,
+  updateAdmin,
+  upgradeUserToAdmin,
+  type AdminSummary,
+} from "@/api/admins";
 import { errorMessage } from "@/api/client";
+import type { AdminRole } from "@/auth/store";
 import { useAuth } from "@/auth/store";
 import {
   Badge,
@@ -17,17 +26,18 @@ import {
   Pagination,
   PasswordInput,
   Select,
-  Spinner,
   statusTone,
+  TableSkeleton,
 } from "@/components/ui";
 import { formatDateTime, formatRelative } from "@/lib/format";
+import { UpgradeAdminModal } from "./admins/UpgradeAdminModal";
 
 const EMPTY_FORM = {
   firstName: "",
   lastName: "",
   email: "",
   password: "",
-  role: "ADMIN" as "ADMIN" | "SUPERADMIN",
+  role: "ADMIN" as AdminRole,
 };
 
 export const Admins = () => {
@@ -38,6 +48,9 @@ export const Admins = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [creating, setCreating] = useState(false);
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+  const [upgradeIfExists, setUpgradeIfExists] = useState(false);
+  const [conflictEmail, setConflictEmail] = useState<string | null>(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [resetFor, setResetFor] = useState<AdminSummary | null>(null);
   const [newPassword, setNewPassword] = useState("");
@@ -47,14 +60,36 @@ export const Admins = () => {
     queryFn: () => listAdmins({ page, limit: 20, search: search.trim() || undefined }),
   });
 
-  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ["admins"] });
+  const invalidate = () => {
+    void queryClient.invalidateQueries({ queryKey: ["admins"] });
+    void queryClient.invalidateQueries({ queryKey: ["platform-users"] });
+  };
 
   const createMutation = useMutation({
-    mutationFn: () => createAdmin(form),
+    mutationFn: () => createAdmin({ ...form, upgradeIfExists }),
     onSuccess: (admin) => {
-      toast.success(`${admin.firstName} ${admin.lastName} can now sign in`);
+      toast.success(`${admin.firstName || admin.email} is now an admin`);
       setForm(EMPTY_FORM);
       setCreating(false);
+      setConflictEmail(null);
+      invalidate();
+    },
+    onError: (error) => {
+      const msg = errorMessage(error);
+      if (msg.toLowerCase().includes("already exists")) {
+        setConflictEmail(form.email);
+      }
+      toast.error(msg);
+    },
+  });
+
+  const upgradeMutation = useMutation({
+    mutationFn: (input: { email: string; role: AdminRole }) => upgradeUserToAdmin(input),
+    onSuccess: (admin) => {
+      toast.success(`${admin.firstName || admin.email} upgraded to ${form.role}`);
+      setForm(EMPTY_FORM);
+      setCreating(false);
+      setConflictEmail(null);
       invalidate();
     },
     onError: (error) => toast.error(errorMessage(error)),
@@ -90,9 +125,14 @@ export const Admins = () => {
         description="Who can sign in to admin.nile.ng."
         actions={
           isSuperAdmin ? (
-            <Button onClick={() => setCreating((value) => !value)}>
-              <Plus className="h-4 w-4" /> {creating ? "Close" : "Add admin"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setUpgradeModalOpen(true)}>
+                <UserCheck className="h-4 w-4" /> Upgrade existing user
+              </Button>
+              <Button onClick={() => setCreating((value) => !value)}>
+                <Plus className="h-4 w-4" /> {creating ? "Close" : "Add admin"}
+              </Button>
+            </div>
           ) : (
             <Badge tone="neutral">Read-only as ADMIN</Badge>
           )
@@ -112,14 +152,20 @@ export const Admins = () => {
               <Input
                 required
                 value={form.firstName}
-                onChange={(event) => setForm({ ...form, firstName: event.target.value })}
+                onChange={(event) => {
+                  setConflictEmail(null);
+                  setForm({ ...form, firstName: event.target.value });
+                }}
               />
             </Field>
             <Field label="Last name">
               <Input
                 required
                 value={form.lastName}
-                onChange={(event) => setForm({ ...form, lastName: event.target.value })}
+                onChange={(event) => {
+                  setConflictEmail(null);
+                  setForm({ ...form, lastName: event.target.value });
+                }}
               />
             </Field>
             <Field label="Email">
@@ -127,7 +173,10 @@ export const Admins = () => {
                 type="email"
                 required
                 value={form.email}
-                onChange={(event) => setForm({ ...form, email: event.target.value })}
+                onChange={(event) => {
+                  setConflictEmail(null);
+                  setForm({ ...form, email: event.target.value });
+                }}
               />
             </Field>
             <Field label="Temporary password" hint="At least 8 characters. They can change it after signing in.">
@@ -142,17 +191,55 @@ export const Admins = () => {
             <Field label="Role">
               <Select
                 value={form.role}
-                onChange={(event) => setForm({ ...form, role: event.target.value as "ADMIN" | "SUPERADMIN" })}
+                onChange={(event) => setForm({ ...form, role: event.target.value as AdminRole })}
               >
                 <option value="ADMIN">ADMIN — read-only console access</option>
                 <option value="SUPERADMIN">SUPERADMIN — can manage admins</option>
               </Select>
             </Field>
-            <div className="flex items-end">
+
+            <div className="flex flex-col justify-end gap-2">
+              <label className="flex items-center gap-2 text-xs text-ink-600">
+                <input
+                  type="checkbox"
+                  checked={upgradeIfExists}
+                  onChange={(e) => setUpgradeIfExists(e.target.checked)}
+                  className="rounded border-ink-300 text-brand-600 focus:ring-brand-500"
+                />
+                Upgrade user if an account with this email already exists
+              </label>
               <Button type="submit" loading={createMutation.isPending} className="w-full sm:w-auto">
                 Create admin
               </Button>
             </div>
+
+            {/* In-form prompt when email already belongs to a registered user */}
+            {conflictEmail && conflictEmail === form.email ? (
+              <div className="sm:col-span-2 rounded-md border border-amber-200 bg-amber-50 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      An account with this email already exists on Nile
+                    </p>
+                    <p className="mt-0.5 text-xs text-amber-700">
+                      You can upgrade this existing user directly to {form.role}.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    loading={upgradeMutation.isPending}
+                    onClick={() =>
+                      upgradeMutation.mutate({
+                        email: form.email,
+                        role: form.role,
+                      })
+                    }
+                  >
+                    Upgrade user to {form.role}
+                  </Button>
+                </div>
+              </div>
+            ) : null}
           </form>
         </Card>
       ) : null}
@@ -172,7 +259,7 @@ export const Admins = () => {
         </div>
 
         {query.isPending ? (
-          <Spinner />
+          <TableSkeleton rows={6} cols={5} />
         ) : query.isError ? (
           <ErrorState message={errorMessage(query.error)} onRetry={() => void query.refetch()} />
         ) : admins.length === 0 ? (
@@ -219,7 +306,7 @@ export const Admins = () => {
                                 variant="secondary"
                                 disabled={updateMutation.isPending}
                                 onClick={() =>
-                                  updateMutation.mutate({
+                                   updateMutation.mutate({
                                     id: admin.id,
                                     changes: { active: !admin.active },
                                     message: admin.active ? "Admin deactivated" : "Admin reactivated",
@@ -268,6 +355,7 @@ export const Admins = () => {
         ) : null}
       </Card>
 
+      {/* Password reset modal */}
       {resetFor ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink-900/40 px-4">
           <Card className="w-full max-w-sm p-5">
@@ -303,6 +391,12 @@ export const Admins = () => {
           </Card>
         </div>
       ) : null}
+
+      {/* Upgrade existing user modal */}
+      <UpgradeAdminModal
+        open={upgradeModalOpen}
+        onClose={() => setUpgradeModalOpen(false)}
+      />
 
       {!isSuperAdmin ? (
         <p className="mt-3 text-xs text-ink-400">

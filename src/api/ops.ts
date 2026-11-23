@@ -328,4 +328,12 @@ export const fetchPlatformUsers = async (params: { page?: number; limit?: number
   };
 };
 
+export const modifyPlatformUser = async (
+  userId: string,
+  body: { role: string; status?: boolean },
+) => {
+  const { data } = await api.put(`/users/user/modify/${userId}`, body);
+  return unwrap<PlatformUser>(data);
+};
+
 export type { Pagination };

@@ -196,3 +196,52 @@ export const Pagination = ({
     </div>
   </div>
 );
+
+export const Skeleton = ({ className }: { className?: string }) => (
+  <div className={cn("animate-pulse rounded bg-ink-100", className)} />
+);
+
+export const TableSkeleton = ({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) => (
+  <div className="divide-y divide-ink-100">
+    {Array.from({ length: rows }).map((_, r) => (
+      <div key={r} className="flex items-center gap-4 px-4 py-3.5">
+        {Array.from({ length: cols }).map((_, c) => (
+          <Skeleton
+            key={c}
+            className={cn(
+              "h-4",
+              c === 0 ? "w-48" : c === cols - 1 ? "ml-auto w-20" : "w-28",
+            )}
+          />
+        ))}
+      </div>
+    ))}
+  </div>
+);
+
+export const Modal = ({
+  open,
+  onClose,
+  title,
+  description,
+  children,
+  maxWidth = "max-w-md",
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  description?: string;
+  children: ReactNode;
+  maxWidth?: string;
+}) => {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-ink-900/40 px-4">
+      <Card className={cn("w-full p-5 shadow-lg", maxWidth)}>
+        <h2 className="text-sm font-semibold text-ink-900">{title}</h2>
+        {description ? <p className="mt-1 text-sm text-ink-600">{description}</p> : null}
+        <div className="mt-4">{children}</div>
+      </Card>
+    </div>
+  );
+};
