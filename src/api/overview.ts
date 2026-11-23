@@ -3,6 +3,7 @@ import { api, unwrap } from "./client";
 export interface OrderAnalytics {
   totalOrders: number;
   paidOrders: number;
+  absoluteValue: number;
   grossProcessedValue: number;
   netProcessedValue: number;
   refundedValue: number;
@@ -18,11 +19,23 @@ export const fetchOrderAnalytics = async (params: { startDate?: string; endDate?
   return unwrap<OrderAnalytics>(data);
 };
 
+export interface SubscriptionPlanStat {
+  name: string;
+  type: string;
+  price: number;
+  count: number;
+  isCustom: boolean;
+  activeCount: number;
+  activeValue: number;
+}
+
 export interface SubscriptionAnalytics {
   totalStores: number;
-  subscriptionsByPlan: Array<{ name: string; type: string; price: number; count: number; isCustom: boolean }>;
+  subscriptionsByPlan: SubscriptionPlanStat[];
   totalCustomOrManual: number;
   statusCounts: Record<string, number>;
+  activeSubscriptionValue: number;
+  generatedAt?: string;
 }
 
 export const fetchSubscriptionAnalytics = async () => {

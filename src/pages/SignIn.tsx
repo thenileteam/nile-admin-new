@@ -51,7 +51,7 @@ export const SignIn = () => {
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-brand-50 to-[#f5f8f5] px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <img src="/nilelogo-green.svg" alt="Nile" className="mx-auto h-12 w-auto" />
+          <img src="/nile_logo.png" alt="Nile" className="mx-auto h-12 w-auto" />
           <p className="mt-4 text-sm font-medium text-brand-700">Admin console</p>
           <p className="mt-1 text-sm text-ink-600">Sign in with your admin account.</p>
         </div>
