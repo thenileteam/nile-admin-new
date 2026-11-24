@@ -60,6 +60,22 @@ export const fetchStoreFollow = async (storeId: string) => {
   return unwrap<FollowOverview>(data);
 };
 
+export type StorePlanName = "BASIC PLAN" | "BUSINESS PLAN" | "PRO PLAN";
+
+/**
+ * Manual plan upgrade, the same route the old merchant-dashboard console used.
+ * The gateway's /store/store prefix resolves to store-service /store, where the
+ * admin route lives; the service writes the plan and emails the merchant.
+ */
+export const upgradeStorePlan = async (body: {
+  storeId: string;
+  subscriptionName: StorePlanName;
+  endDate: string;
+}) => {
+  const { data } = await api.post("/store/store/admin/subscriptions/manual-upgrade", body);
+  return unwrap<unknown>(data);
+};
+
 export const fetchStoreActivity = async (
   storeId: string,
   params: { type?: string; cursor?: string; limit?: number },
