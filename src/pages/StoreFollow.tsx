@@ -69,7 +69,7 @@ const humanize = (value: string) => {
 };
 
 /** storeUrl is stored without a protocol on some stores. */
-const storeHref = (storeUrl: string) => (/^https?:\/\//i.test(storeUrl) ? storeUrl : `https://${storeUrl}`);
+const storeHref = (storeUrl: string) => (/^https?:\/\//i.test(storeUrl) ? storeUrl : `https://${storeUrl}.nile.ng`);
 
 /** How far through its paid period a subscription is. */
 const planProgress = (start?: string | null, end?: string | null) => {
